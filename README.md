@@ -1,10 +1,15 @@
 # 夜班急救 · NIGHT SHIFT
 
+**在线试玩（GitHub Pages）：[https://gaolyleo.github.io/night-shift-ambulance/](https://gaolyleo.github.io/night-shift-ambulance/)**
+
 一个霓虹斜俯视 2.5D 的开放城市救护车小游戏。你是一名夜班救护车司机：接走街头倒下的病人，把他们送回医院赚钱；也可以亲手把路人撞飞，再把他们拉回医院。
 
 浏览器运行，原生 JavaScript ES Modules，无第三方依赖。
 
 ## 运行
+
+- **在线直接玩**：访问 [https://gaolyleo.github.io/night-shift-ambulance/](https://gaolyleo.github.io/night-shift-ambulance/)
+- **本地开发运行**：
 
 ```bash
 npm run dev
