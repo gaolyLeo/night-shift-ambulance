@@ -1,0 +1,11 @@
+{
+  "name": "night-shift-ambulance",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A neon oblique top-down ambulance game. Hit pedestrians, then save them.",
+  "scripts": {
+    "dev": "node tools/serve.mjs",
+    "start": "node tools/serve.mjs"
+  }
+}

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#050711">
+  <title>夜班急救 · NIGHT SHIFT</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles/main.css">
+</head>
+<body>
+  <main id="app">
+    <canvas id="game" aria-label="夜班急救游戏画面"></canvas>
+    <div class="vignette" aria-hidden="true"></div>
+    <div class="grain" aria-hidden="true"></div>
+
+    <div id="hud" class="hud" hidden>
+      <header class="hud-top">
+        <section class="hud-left">
+          <div class="cash"><span class="cash-symbol">$</span><span id="cash-value">0</span></div>
+          <div class="hud-sub"><span class="live-dot"></span> DISTRICT 07 · 夜班</div>
+        </section>
+
+        <section class="hud-center">
+          <div class="shift-chip"><span id="shift-label">值班中</span></div>
+          <div id="alert-chip" class="alert-chip" hidden>危险</div>
+        </section>
+
+        <section class="hud-right">
+          <div class="passenger-chip" title="车上病人">
+            <span class="cross">✚</span>
+            <span id="passenger-count">0/1</span>
+          </div>
+          <button id="mute-btn" class="icon-btn" type="button" aria-label="静音">
+            <span id="mute-icon">♪</span>
+          </button>
+          <button id="pause-btn" class="icon-btn" type="button" aria-label="暂停">
+            <span class="pause-icon"></span>
+          </button>
+        </section>
+      </header>
+
+      <section id="passenger-panel" class="passenger-panel" hidden>
+        <div class="panel-title"><span>车上病人</span><span id="passenger-capacity">0 / 1</span></div>
+        <div id="passenger-list"></div>
+      </section>
+
+      <section class="prompt" id="prompt" hidden>
+        <kbd>E</kbd>
+        <span id="prompt-text">交互</span>
+      </section>
+
+      <footer class="hud-bottom">
+        <div class="speedo">
+          <span id="speed-value">0</span>
+          <span class="speed-unit">KM/H</span>
+          <div class="nitro-gauge" id="nitro-gauge" title="Shift 氮气冲刺">
+            <span class="nitro-label">NITRO</span>
+            <div class="nitro-track"><span id="nitro-fill"></span></div>
+          </div>
+          <div class="siren-state" id="siren-state"><span></span><span id="siren-label">警报关闭</span></div>
+        </div>
+        <div class="street-label">ST. VINCENT GENERAL HOSPITAL · 圣文森特医院</div>
+        <div class="minimap-frame">
+          <canvas id="minimap" aria-label="小地图"></canvas>
+          <span class="minimap-label">N</span>
+        </div>
+      </footer>
+
+      <div id="toasts" class="toasts" aria-live="polite"></div>
+    </div>
+
+    <div id="overlay" class="overlay">
+      <section id="screen-title" class="screen title-screen">
+        <div class="title-glow" aria-hidden="true"></div>
+        <div class="eyebrow">NIGHT SHIFT · DISTRICT 07</div>
+        <h1>夜班急救</h1>
+        <div class="title-en">N I G H T &nbsp; S H I F T</div>
+        <p class="tagline">撞飞他们，再救活他们。</p>
+
+        <div class="start-controls">
+          <div class="control"><kbd>W</kbd><kbd>S</kbd><span>前进 / 倒车</span></div>
+          <div class="control"><kbd>A</kbd><kbd>D</kbd><span>转向自动漂移</span></div>
+          <div class="control"><kbd>Shift</kbd><span>氮气冲刺</span></div>
+          <div class="control"><kbd>AUTO</kbd><span>靠近病人磁吸上车</span></div>
+          <div class="control"><kbd>E</kbd><span>医院车库升级</span></div>
+        </div>
+
+        <button id="start-btn" class="btn btn-primary" type="button">开始值班</button>
+        <p class="fineprint">街头会有人倒下。也可以由你制造病人。<br>转向自动甩尾，靠近病人自动磁吸，冲进医院秒交。</p>
+      </section>
+
+      <section id="screen-pause" class="screen pause-screen" hidden>
+        <div class="eyebrow">SHIFT PAUSED</div>
+        <h2>值班暂停</h2>
+        <p class="muted">城市还在等你。</p>
+        <div class="btn-row">
+          <button id="resume-btn" class="btn btn-primary" type="button">继续值班</button>
+          <button id="restart-btn" class="btn btn-ghost" type="button">重新开始</button>
+        </div>
+        <p class="fineprint">Esc / P 继续 · A/D 自动漂移 · Shift 氮气 · F 警报 · 医院按 E 升级</p>
+      </section>
+    </div>
+
+    <div id="upgrade-overlay" class="overlay" hidden>
+      <section class="screen upgrade-screen">
+        <header class="upgrade-head">
+          <div>
+            <div class="eyebrow">ST. VINCENT GENERAL HOSPITAL</div>
+            <h2>救护车升级</h2>
+          </div>
+          <div class="upgrade-cash"><span id="upgrade-cash-symbol">$</span><span id="upgrade-cash">0</span></div>
+        </header>
+        <p class="upgrade-note">停在医院急救区按 E 打开。升级立即生效。</p>
+        <div id="upgrade-list" class="upgrade-list"></div>
+        <footer class="upgrade-foot">
+          <span class="muted">钱可以是负数。罚款不等人。</span>
+          <button id="close-upgrades" class="btn btn-primary" type="button">继续值班</button>
+        </footer>
+      </section>
+    </div>
+
+    <div class="rotate-hint">
+      <span>↻</span>
+      <p>横屏游玩体验更好</p>
+    </div>
+  </main>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
