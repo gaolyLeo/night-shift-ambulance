@@ -18,7 +18,7 @@
       <header class="hud-top">
         <section class="hud-left">
           <div class="cash"><span class="cash-symbol">$</span><span id="cash-value">0</span></div>
-          <div class="hud-sub"><span class="live-dot"></span> DISTRICT 07 · 夜班</div>
+          <div class="hud-sub"><span class="live-dot"></span><span id="hud-context">DISTRICT 07 · 夜班</span></div>
         </section>
 
         <section class="hud-center">
@@ -27,10 +27,16 @@
         </section>
 
         <section class="hud-right">
+          <button id="drive-mode-btn" class="drive-mode-btn is-mouse" type="button" aria-pressed="true" title="切换到 WASD (C)">鼠标</button>
           <div class="passenger-chip" title="车上病人">
             <span class="cross">✚</span>
             <span id="passenger-count">0/1</span>
           </div>
+          <section id="pvp-rival-panel" class="pvp-rival-panel" hidden>
+            <span class="pvp-rival-label">AI · 生命值</span>
+            <strong><span>$</span><span id="pvp-rival-cash">1,000</span></strong>
+            <small>弹药 <span id="pvp-rival-ammo">0/2</span></small>
+          </section>
           <button id="mute-btn" class="icon-btn" type="button" aria-label="静音">
             <span id="mute-icon">♪</span>
           </button>
@@ -46,7 +52,7 @@
       </section>
 
       <section class="prompt" id="prompt" hidden>
-        <kbd>E</kbd>
+        <kbd id="prompt-key">E</kbd>
         <span id="prompt-text">交互</span>
       </section>
 
@@ -86,8 +92,13 @@
           <div class="control"><kbd>E</kbd><span>医院车库升级</span></div>
         </div>
 
-        <button id="start-btn" class="btn btn-primary" type="button">开始值班</button>
+        <div class="title-actions">
+          <button id="start-btn" class="btn btn-primary" type="button">开始值班</button>
+          <button id="pvp-btn" class="btn btn-ghost" type="button">单人 PvP · AI 对手</button>
+        </div>
         <p class="fineprint">街头会有人倒下。也可以由你制造病人。<br>转向自动甩尾，靠近病人自动磁吸，冲进医院秒交。</p>
+        <p class="fineprint pvp-fineprint">单人 PvP：你用 WASD 或鼠标驾驶，按 Q 投掷、E 装载；AI 会自动驾驶、抢伤员并攻击。击中对手扣 $150 生命值。</p>
+        <p class="fineprint">默认鼠标跟随驾驶：移动光标控制车辆目标；游戏中按 C 或 HUD 按钮切换到 WASD。</p>
       </section>
 
       <section id="screen-pause" class="screen pause-screen" hidden>
@@ -98,7 +109,20 @@
           <button id="resume-btn" class="btn btn-primary" type="button">继续值班</button>
           <button id="restart-btn" class="btn btn-ghost" type="button">重新开始</button>
         </div>
-        <p class="fineprint">Esc / P 继续 · A/D 自动漂移 · Shift 氮气 · F 警报 · 医院按 E 升级</p>
+        <p id="pause-instructions" class="fineprint">Esc / P 继续 · A/D 自动漂移 · Shift 氮气 · F 警报 · 医院按 E 升级</p>
+      </section>
+    </div>
+
+    <div id="match-over-overlay" class="overlay" hidden>
+      <section class="screen pause-screen match-over-screen">
+        <div class="eyebrow">DISTRICT 07 · MATCH COMPLETE</div>
+        <h2 id="match-result">P1 获胜</h2>
+        <p class="muted">伤员是弹药，现金是生命值。</p>
+        <div class="btn-row">
+          <button id="pvp-rematch-btn" class="btn btn-primary" type="button">再来一局</button>
+          <button id="pvp-title-btn" class="btn btn-ghost" type="button">返回标题</button>
+        </div>
+        <p class="fineprint">WASD 或鼠标目标驾驶 · Shift 氮气 · Q 投掷 · E 装载<br>AI 会自动寻找伤员、瞄准并攻击</p>
       </section>
     </div>
 

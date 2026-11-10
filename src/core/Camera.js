@@ -66,6 +66,33 @@ export class Camera {
     this.clampToWorld();
   }
 
+  followPair(first, second, dt) {
+    const midpointX = (first.x + second.x) * 0.5;
+    const midpointY = (first.y + second.y) * 0.5;
+    const spanX = Math.abs(first.x - second.x) + 520;
+    const spanY = Math.abs(first.y - second.y) + 380;
+    const fitZoom = Math.min(
+      this.baseZoom,
+      this.viewW / spanX,
+      this.viewH / (spanY * this.yScale)
+    );
+    const targetZoom = clamp(fitZoom, 0.36, this.baseZoom);
+    const meanVelocityX = ((first.velocity?.x || 0) + (second.velocity?.x || 0)) * 0.5;
+    const meanVelocityY = ((first.velocity?.y || 0) + (second.velocity?.y || 0)) * 0.5;
+    const desiredX = midpointX + clamp(meanVelocityX * 0.12, -90, 90);
+    const desiredY = midpointY - this.offsetY + clamp(meanVelocityY * 0.12, -70, 70);
+
+    this.x = damp(this.x, desiredX, 5.2, dt);
+    this.y = damp(this.y, desiredY, 5.2, dt);
+    this.dynamicZoom = damp(this.dynamicZoom, targetZoom / this.baseZoom, 3.2, dt);
+    this.zoom = clamp(
+      this.baseZoom * this.dynamicZoom + this.zoomPunch,
+      0.34,
+      VIEW.zoomMax * 1.15
+    );
+    this.clampToWorld();
+  }
+
   addShake(amount) {
     this.shake = clamp(this.shake + amount, 0, 1.35);
   }

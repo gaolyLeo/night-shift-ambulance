@@ -1,6 +1,14 @@
 import { AMBULANCE, VIEW } from '../config.js';
 import { clamp, roundRectPath, TAU } from '../core/math.js';
 
+const THROWN_PERSON_LOOKS = [
+  { shirt: '#e65f70', pants: '#26334c', skin: '#f1c6a8', hair: '#352b35' },
+  { shirt: '#6292c9', pants: '#292c3d', skin: '#c98d64', hair: '#211b20' },
+  { shirt: '#d9a755', pants: '#34404b', skin: '#f0c9a4', hair: '#563c2c' },
+  { shirt: '#7d9b78', pants: '#273342', skin: '#9e674d', hair: '#25222b' },
+  { shirt: '#a477b8', pants: '#3c3047', skin: '#e4b08a', hair: '#302532' }
+];
+
 export class Renderer {
   constructor(game) {
     this.game = game;
@@ -58,6 +66,9 @@ export class Renderer {
 
     this.drawHospitalMarker(ctx, camera, game);
     this.drawPatientMarkers(ctx, camera, game);
+    if (game.mouseDriveEnabled) {
+      this.drawMouseDriveTarget(ctx, camera, game.getMouseDriveTarget(), game.time);
+    }
 
     game.effects.draw(ctx, camera);
 
@@ -237,6 +248,12 @@ export class Renderer {
     for (const patient of game.patients.waiting) {
       drawables.push({ sortY: patient.y, type: 'patient', value: patient });
     }
+    if (game.pvp.active) {
+      drawables.push({ sortY: game.pvp.opponent.y + 2, type: 'rival', value: game.pvp.opponent });
+      for (const projectile of game.pvp.projectiles) {
+        drawables.push({ sortY: projectile.y - 22, type: 'projectile', value: projectile });
+      }
+    }
     drawables.push({ sortY: game.player.y + 2, type: 'player', value: game.player });
 
     drawables.sort((a, b) => a.sortY - b.sortY);
@@ -263,6 +280,12 @@ export class Renderer {
           break;
         case 'player':
           this.drawAmbulance(ctx, camera, item.value, game);
+          break;
+        case 'rival':
+          this.drawAmbulance(ctx, camera, item.value, game);
+          break;
+        case 'projectile':
+          this.drawThrownPatient(ctx, camera, item.value);
           break;
         default:
           break;
@@ -1122,6 +1145,113 @@ export class Renderer {
     ctx.restore();
   }
 
+  drawThrownPatient(ctx, camera, projectile) {
+    if (!camera.isVisible(projectile.x, projectile.y, 90)) return;
+    const ground = camera.worldToScreen(projectile.x, projectile.y);
+    const pos = camera.worldToScreen(projectile.x, projectile.y, 10 + projectile.z);
+    const lookIndex = Math.abs(projectile.patient?.id || 0) % THROWN_PERSON_LOOKS.length;
+    const look = THROWN_PERSON_LOOKS[lookIndex];
+    const phase = lookIndex * 1.31;
+    const armFlail = Math.sin(projectile.age * 17 + phase) * 5;
+    const legFlail = Math.cos(projectile.age * 13 + phase) * 4;
+    const angle =
+      this.screenAngle(Math.atan2(projectile.vy, projectile.vx)) + projectile.spin;
+    const zoom = camera.zoom;
+    const heightRatio = clamp(projectile.z / 46, 0, 1);
+
+    // The shadow stays on the ground while the body follows a short ballistic arc.
+    ctx.fillStyle = `rgba(0, 0, 0, ${0.3 - heightRatio * 0.17})`;
+    ctx.beginPath();
+    ctx.ellipse(
+      ground.x + 2,
+      ground.y + 2,
+      (10 + heightRatio * 2) * zoom,
+      (4.2 + heightRatio) * zoom,
+      0,
+      0,
+      TAU
+    );
+    ctx.fill();
+
+    ctx.save();
+    ctx.translate(pos.x, pos.y);
+    ctx.rotate(angle);
+    ctx.scale(zoom, zoom);
+
+    // A faint wake gives speed without making the person read as a bullet.
+    ctx.globalCompositeOperation = 'lighter';
+    const wake = ctx.createLinearGradient(-38, 0, -8, 0);
+    wake.addColorStop(0, 'rgba(255, 95, 158, 0)');
+    wake.addColorStop(0.7, 'rgba(255, 95, 158, 0.28)');
+    wake.addColorStop(1, 'rgba(255, 210, 218, 0.48)');
+    ctx.strokeStyle = wake;
+    ctx.lineWidth = 2.4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-38, 0);
+    ctx.lineTo(-13, 0);
+    ctx.moveTo(-31, -5);
+    ctx.lineTo(-19, -5);
+    ctx.moveTo(-34, 5);
+    ctx.lineTo(-23, 5);
+    ctx.stroke();
+    ctx.globalCompositeOperation = 'source-over';
+
+    const limb = (x1, y1, x2, y2, color, width) => {
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.strokeStyle = '#151b29';
+      ctx.lineWidth = width + 2.1;
+      ctx.stroke();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.stroke();
+    };
+
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Legs trail behind the hips, kicked apart by the throw.
+    limb(-5, -2, -11, -7 - legFlail * 0.35, look.pants, 3.1);
+    limb(-11, -7 - legFlail * 0.35, -20, -5 - legFlail, '#1d2638', 2.5);
+    limb(-5, 2, -12, 7 + legFlail * 0.35, look.pants, 3.1);
+    limb(-12, 7 + legFlail * 0.35, -20, 5 + legFlail, '#1d2638', 2.5);
+
+    // Arms flail away from the torso; the hands and shoes stay visible at game scale.
+    limb(3, -2, -1, -8 - armFlail * 0.35, look.shirt, 3.2);
+    limb(-1, -8 - armFlail * 0.35, -10, -12 - armFlail, look.skin, 2.2);
+    limb(3, 2, -2, 8 + armFlail * 0.35, look.shirt, 3.2);
+    limb(-2, 8 + armFlail * 0.35, -10, 12 + armFlail, look.skin, 2.2);
+
+    // A compact torso, neck, and shaded head make the silhouette unmistakably human.
+    ctx.fillStyle = '#151b29';
+    roundRectPath(ctx, -8.5, -4.4, 19, 8.8, 4.2);
+    ctx.fill();
+    ctx.fillStyle = look.shirt;
+    roundRectPath(ctx, -7.8, -3.5, 17, 7, 3.5);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.24)';
+    roundRectPath(ctx, -2, -2.5, 8, 1.2, 0.6);
+    ctx.fill();
+    ctx.strokeStyle = look.skin;
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(8, 0);
+    ctx.lineTo(11, 0);
+    ctx.stroke();
+
+    ctx.fillStyle = look.hair;
+    ctx.beginPath();
+    ctx.arc(14, 0, 4.6, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = look.skin;
+    ctx.beginPath();
+    ctx.arc(15, 0, 3.7, 0, TAU);
+    ctx.fill();
+    ctx.restore();
+  }
+
   drawAmbulance(ctx, camera, player, game) {
     const angle = player.angle;
     const zoom = camera.zoom;
@@ -1414,6 +1544,11 @@ export class Renderer {
       ctx.fill();
       ctx.restore();
     }
+
+    if (player.teamLabel && player.teamColor) {
+      const marker = camera.worldToScreen(player.x, player.y, 39);
+      this.drawLabelPill(ctx, marker.x, marker.y - 8 * zoom, player.teamLabel, player.teamColor);
+    }
   }
 
   drawLabelPill(ctx, x, y, label, color, { background = 'rgba(5, 10, 20, 0.82)', borderAlpha = 1 } = {}) {
@@ -1488,6 +1623,32 @@ export class Renderer {
       const label = isAccident ? `${seconds}s` : `${Math.ceil(patient.waitTimer)}s`;
       this.drawLabelPill(ctx, pos.x, markerY - 34, label, color, { borderAlpha: 0.4 });
     }
+  }
+
+  drawMouseDriveTarget(ctx, camera, target, time) {
+    if (!target || !camera.isVisible(target.x, target.y, 80)) return;
+    const pos = camera.worldToScreen(target.x, target.y);
+    const pulse = 1 + Math.sin(time * 6) * 0.12;
+    const radius = 13 * camera.zoom * pulse;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = 'rgba(93, 233, 255, 0.92)';
+    ctx.lineWidth = 1.7;
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, radius, 0, TAU);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(pos.x - radius * 1.55, pos.y);
+    ctx.lineTo(pos.x - radius * 0.72, pos.y);
+    ctx.moveTo(pos.x + radius * 0.72, pos.y);
+    ctx.lineTo(pos.x + radius * 1.55, pos.y);
+    ctx.moveTo(pos.x, pos.y - radius * 1.55);
+    ctx.lineTo(pos.x, pos.y - radius * 0.72);
+    ctx.moveTo(pos.x, pos.y + radius * 0.72);
+    ctx.lineTo(pos.x, pos.y + radius * 1.55);
+    ctx.stroke();
+    ctx.restore();
   }
 
   drawHospitalMarker(ctx, camera, game) {

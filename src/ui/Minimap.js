@@ -117,6 +117,25 @@ export class Minimap {
     ctx.fill();
     ctx.restore();
 
+    if (game.pvp.active) {
+      const rival = game.pvp.opponent;
+      const rp = toMap(rival.x, rival.y);
+      ctx.save();
+      ctx.translate(rp.x, rp.y);
+      ctx.rotate(rival.angle);
+      ctx.fillStyle = '#ff5f9e';
+      ctx.shadowColor = '#ff5f9e';
+      ctx.shadowBlur = 7;
+      ctx.beginPath();
+      ctx.moveTo(6, 0);
+      ctx.lineTo(-3.5, -3.5);
+      ctx.lineTo(-1.5, 0);
+      ctx.lineTo(-3.5, 3.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
     // Scan sweep.
     const sweep = (game.time * 0.3) % 1;
     ctx.save();

@@ -8,6 +8,7 @@ import { Ambulance } from '../entities/Ambulance.js';
 import { Pedestrian } from '../entities/Pedestrian.js';
 import { UpgradeSystem } from '../systems/UpgradeSystem.js';
 import { PatientSystem } from '../systems/PatientSystem.js';
+import { PvpSystem } from '../systems/PvpSystem.js';
 import { TrafficSystem } from '../systems/TrafficSystem.js';
 import { Effects } from '../systems/Effects.js';
 import { Renderer } from '../render/Renderer.js';
@@ -41,11 +42,15 @@ export class Game {
     this.player.setStats(this.upgrades.stats);
     this.effects = new Effects(this);
     this.patients = new PatientSystem(this);
+    this.pvp = new PvpSystem(this);
     this.trafficSystem = new TrafficSystem(this);
     this.traffic = this.trafficSystem.cars;
 
     this.pedestrians = [];
     this.state = 'title';
+    this.mouseDriveEnabled = true;
+    document.body.classList.add('is-mouse-driving');
+    this.mousePointer = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
     this.resetTransientState();
     this.last = performance.now();
 
@@ -74,6 +79,43 @@ export class Game {
       if (document.hidden && this.state === 'playing') this.togglePause();
     };
     document.addEventListener('visibilitychange', this.onVisibility);
+
+    this.onPointerMove = (event) => {
+      this.mousePointer = { x: event.clientX, y: event.clientY };
+    };
+    window.addEventListener('pointermove', this.onPointerMove);
+  }
+
+  screenToWorld(x, y) {
+    return {
+      x: this.camera.x + (x - this.camera.viewW / 2 - this.camera.shakeX) / this.camera.zoom,
+      y: this.camera.y +
+        (y - this.camera.viewH / 2 - this.camera.shakeY) / (this.camera.zoom * this.camera.yScale)
+    };
+  }
+
+  resolveMouseTarget(point) {
+    return this.city.resolveFreePoint(point.x, point.y, AMBULANCE.radius + 6);
+  }
+
+  getMouseDriveTarget() {
+    if (!this.mouseDriveEnabled) return null;
+    return this.resolveMouseTarget(this.screenToWorld(this.mousePointer.x, this.mousePointer.y));
+  }
+
+  toggleMouseDrive() {
+    this.mouseDriveEnabled = !this.mouseDriveEnabled;
+    this.pvp.mouseNav = this.pvp.createNavigatorState();
+    document.body.classList.toggle('is-mouse-driving', this.mouseDriveEnabled);
+    this.hud?.setDriveMode(this.mouseDriveEnabled);
+    if (this.state === 'playing') {
+      this.hud.toast(
+        this.mouseDriveEnabled
+          ? '鼠标目标驾驶已开启 · 移动光标控制车辆目标'
+          : 'WASD 驾驶已开启',
+        'gold'
+      );
+    }
   }
 
   resize() {
@@ -116,6 +158,10 @@ export class Game {
       this.toggleMute();
     }
 
+    if (this.state === 'playing' && input.wasPressed('KeyC')) {
+      this.toggleMouseDrive();
+    }
+
     if (this.state === 'playing') {
       if (input.anyPressed('Escape', 'KeyP')) {
         this.togglePause();
@@ -142,6 +188,8 @@ export class Game {
       return;
     }
 
+    if (this.state === 'matchOver') return;
+
     if (this.state === 'title') {
       this.time += dt;
       if (input.anyPressed('Space', 'Enter')) {
@@ -161,10 +209,12 @@ export class Game {
     this.minimap.update(dt);
   }
 
-  startRun() {
+  startRun(mode = 'classic') {
     this.audio.ensure();
     this.audio.setSiren(false);
 
+    this.pvp.reset();
+    this.mode = mode;
     this.upgrades.reset();
     this.player.setStats(this.upgrades.stats);
     this.player.sirenOn = false;
@@ -174,9 +224,13 @@ export class Game {
     this.effects.reset();
     this.spawnPedestrians();
     this.trafficSystem.reset();
+    if (mode === 'pvp') this.pvp.start();
 
     this.camera.setViewport(this.renderer.width, this.renderer.height);
-    this.camera.snapTo(this.player);
+    this.camera.dynamicZoom = 1;
+    this.camera.zoomPunch = 0;
+    this.camera.zoom = this.camera.baseZoom;
+    this.camera.snapTo(this.pvp.active ? this.pvp.getCameraTarget() : this.player);
     this.resetTransientState();
     this.state = 'playing';
     this.last = performance.now();
@@ -187,8 +241,13 @@ export class Game {
     document.body.classList.add('is-playing');
     this.hud.update();
     this.hud.setPrompt(null);
-    this.hud.toast('夜班开始 · 靠近病人自动磁吸上车', 'gold');
-    this.hud.toast('转向自动漂移 · Shift 氮气冲刺 · 冲回医院自动秒交', 'muted');
+    if (this.pvp.active) {
+      this.hud.toast('PvP 开始 · 双方现金为生命值，击中扣 $150', 'danger');
+      this.hud.toast('默认鼠标跟随 · 移动光标驾驶 · C 切换 WASD · Q 投掷', 'gold');
+    } else {
+      this.hud.toast('默认鼠标跟随 · 移动光标驾驶 · C 切换 WASD', 'gold');
+      this.hud.toast('转向自动漂移 · Shift 氮气冲刺 · 冲回医院自动秒交', 'muted');
+    }
 
     this.patients.spawnCall();
     this.patients.spawnTimer = rand(8, 13);
@@ -204,6 +263,9 @@ export class Game {
       this.lastDriveInputTime = this.time;
     }
 
+    const mouseTarget = this.getMouseDriveTarget();
+    if (mouseTarget) this.lastDriveInputTime = this.time;
+
     if (this.hitstop > 0) {
       this.hitstop = Math.max(0, this.hitstop - dt);
       this.camera.update(dt);
@@ -212,7 +274,27 @@ export class Game {
       return;
     }
 
-    const result = this.player.update(dt, this.input);
+    const playerInput = this.mouseDriveEnabled
+      ? this.pvp.getMouseInput(mouseTarget, dt)
+      : this.pvp.active
+        ? this.pvp.getPlayerInput()
+        : this.input;
+    const result = this.player.update(dt, playerInput);
+
+    if (this.pvp.active) {
+      const rivalResult = this.pvp.opponent.update(dt, this.pvp.getBotInput(dt));
+      if (rivalResult.wallImpact && this.crashCooldown <= 0) {
+        this.audio.crash();
+        const pt = rivalResult.impactPoint || {
+          x: this.pvp.opponent.x,
+          y: this.pvp.opponent.y
+        };
+        this.effects.wallHit(pt.x, pt.y, pt.nx || 0, pt.ny || 1, 0.45);
+      }
+      if (rivalResult.driftBoosted) {
+        this.effects.text(this.pvp.opponent.x, this.pvp.opponent.y, '漂移弹射!', '#ff5f9e', 13);
+      }
+    }
 
     if (this.player.boosting && !this.wasBoosting) {
       this.audio.ensure();
@@ -284,11 +366,20 @@ export class Game {
     this.updatePedestrians(dt);
 
     const humanDriving = this.lastDriveInputTime >= 0;
-    this.patients.updateAutoInteract(this.player, this.upgrades.stats, humanDriving, dt);
+    if (!this.pvp.active) {
+      this.patients.updateAutoInteract(this.player, this.upgrades.stats, humanDriving, dt);
+    }
     this.patients.update(dt);
+    this.pvp.update(dt);
+    if (this.state !== 'playing') {
+      this.effects.update(dt);
+      this.hud.update();
+      return;
+    }
     this.effects.update(dt);
 
-    this.camera.follow(this.player, dt);
+    if (this.pvp.active) this.camera.followPair(this.player, this.pvp.opponent, dt);
+    else this.camera.follow(this.player, dt);
     this.camera.update(dt);
     this.audio.updateEngine(this.player.speedRatio, this.player.boosting);
 
@@ -298,26 +389,30 @@ export class Game {
   }
 
   updatePedestrians(dt) {
-    const impactSpeed = this.player.totalSpeed;
+    const vehicles = this.pvp.active ? [this.player, this.pvp.opponent] : [this.player];
     for (let i = this.pedestrians.length - 1; i >= 0; i -= 1) {
       const pedestrian = this.pedestrians[i];
       pedestrian.update(dt);
 
-      if (
-        pedestrian.state === 'walking' &&
-        impactSpeed > AMBULANCE.hitSpeed &&
-        this.playerHitsPedestrian(pedestrian)
-      ) {
-        pedestrian.hit(this.player.angle, impactSpeed * (this.player.boosting ? 1.25 : 1));
-        this.effects.blood(pedestrian.x, pedestrian.y, 22, this.player.angle);
+      const hitter = vehicles.find(
+        (vehicle) =>
+          pedestrian.state === 'walking' &&
+          vehicle.totalSpeed > AMBULANCE.hitSpeed &&
+          this.vehicleHitsPedestrian(vehicle, pedestrian)
+      );
+
+      if (hitter) {
+        const impactSpeed = hitter.totalSpeed;
+        pedestrian.hit(hitter.angle, impactSpeed * (hitter.boosting ? 1.25 : 1));
+        this.effects.blood(pedestrian.x, pedestrian.y, 22, hitter.angle);
         this.effects.spark(pedestrian.x, pedestrian.y, '#ffd9e2', 11, 130, 10);
         this.effects.text(pedestrian.x, pedestrian.y, '撞飞!', '#ff8fa4', 14);
         this.hitstop = Math.max(this.hitstop, 0.024);
         this.camera.addShake(0.28 + Math.min(0.32, impactSpeed / 650));
         this.camera.addZoomPunch(0.028);
         this.audio.hit();
-        this.player.addNitro(16);
-        this.player.speed *= this.player.boosting ? 0.96 : 0.92;
+        hitter.addNitro(16);
+        hitter.speed *= hitter.boosting ? 0.96 : 0.92;
       }
 
       if (pedestrian.state === 'downed') {
@@ -329,10 +424,14 @@ export class Game {
   }
 
   playerHitsPedestrian(pedestrian) {
-    const dx = pedestrian.x - this.player.x;
-    const dy = pedestrian.y - this.player.y;
-    const cos = Math.cos(this.player.angle);
-    const sin = Math.sin(this.player.angle);
+    return this.vehicleHitsPedestrian(this.player, pedestrian);
+  }
+
+  vehicleHitsPedestrian(vehicle, pedestrian) {
+    const dx = pedestrian.x - vehicle.x;
+    const dy = pedestrian.y - vehicle.y;
+    const cos = Math.cos(vehicle.angle);
+    const sin = Math.sin(vehicle.angle);
     const forward = dx * cos + dy * sin;
     const side = -dx * sin + dy * cos;
 
@@ -344,6 +443,11 @@ export class Game {
   }
 
   updatePrompt() {
+    if (this.pvp.active) {
+      this.hud.setPrompt('靠近伤员自动装弹 · 按 Q 投掷 · AI 自动攻击', false, 'PvP');
+      return;
+    }
+
     const inHospital = this.city.inHospitalZone(this.player.x, this.player.y, 44);
     const passengers = this.patients.passengers.length;
 
@@ -374,6 +478,11 @@ export class Game {
   }
 
   interact() {
+    if (this.pvp.active) {
+      this.pvp.tryPickup(this.player, 0);
+      return;
+    }
+
     if (this.patients.deliverAtHospital(this.player)) return;
 
     if (this.city.inHospitalZone(this.player.x, this.player.y, 44)) {
@@ -444,6 +553,7 @@ export class Game {
   }
 
   addMoney(amount) {
+    if (this.pvp.active) return;
     this.upgrades.addMoney(amount);
   }
 

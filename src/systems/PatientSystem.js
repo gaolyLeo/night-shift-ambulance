@@ -80,7 +80,8 @@ export class PatientSystem {
   }
 
   spawnCall() {
-    const point = this.game.city.randomPatientPoint(this.game.player, 300);
+    const avoid = this.game.pvp?.active ? this.game.pvp.getCameraTarget() : this.game.player;
+    const point = this.game.city.randomPatientPoint(avoid, 300);
     const patient = this.createWaitingPatient(point, 'call');
 
     this.waiting.push(patient);

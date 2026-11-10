@@ -121,6 +121,22 @@ export const GAME = {
   startMoney: 0
 };
 
+export const PVP = {
+  startingHealth: 1000,
+  hitDamage: 150,
+  carriedPatientDeathDamage: 80,
+  ammoCapacity: 2,
+  pickupRange: 58,
+  manualPickupRange: 112,
+  projectileSpeed: 620,
+  projectileRadius: 12,
+  projectileLifetime: 2.4,
+  aiFireRange: 680,
+  aiAimTolerance: 0.2,
+  aiFireCooldown: 1.35,
+  aiRepathInterval: 1.6
+};
+
 export const CITY = {
   hospitalBlock: { col: 3, row: 2 }
 };

@@ -69,6 +69,10 @@ body.is-playing #game {
   cursor: none;
 }
 
+body.is-playing.is-mouse-driving #game {
+  cursor: crosshair;
+}
+
 .vignette {
   position: absolute;
   inset: 0;
@@ -201,6 +205,70 @@ body.is-playing #game {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.drive-mode-btn {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid rgba(143, 190, 255, 0.22);
+  border-radius: 999px;
+  color: #b9e9ff;
+  background: rgba(7, 12, 25, 0.68);
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+}
+
+.drive-mode-btn:hover,
+.drive-mode-btn.is-mouse {
+  border-color: rgba(93, 233, 255, 0.55);
+  color: #e7fdff;
+  background: rgba(20, 48, 65, 0.78);
+}
+
+.pvp-rival-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  min-width: 112px;
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 95, 158, 0.34);
+  border-radius: 12px;
+  background: rgba(35, 8, 25, 0.62);
+  box-shadow: inset 0 0 20px rgba(255, 95, 158, 0.06);
+  font-family: var(--mono);
+}
+
+.pvp-rival-label {
+  color: #ff9bc1;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+}
+
+.pvp-rival-panel strong {
+  color: #ffeaf3;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.pvp-rival-panel strong span:first-child {
+  margin-right: 2px;
+  color: #ff5f9e;
+  font-size: 0.7em;
+}
+
+.pvp-rival-panel small {
+  color: #c88aa5;
+  font-size: 9px;
+}
+
+.pvp-rival-panel small span {
+  color: #ffe0ec;
 }
 
 .passenger-chip {
@@ -725,6 +793,23 @@ h1 {
   margin-left: 4px;
 }
 
+.title-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.pvp-fineprint {
+  margin-top: 9px;
+  color: rgba(255, 155, 193, 0.68);
+}
+
+.match-over-screen h2 {
+  color: #ffb5d0;
+  text-shadow: 0 0 28px rgba(255, 95, 158, 0.22);
+}
+
 .btn {
   position: relative;
   display: inline-flex;
@@ -1076,6 +1161,21 @@ h2 {
     padding: 0 10px;
   }
 
+  .drive-mode-btn {
+    height: 31px;
+    padding: 0 7px;
+    font-size: 8px;
+  }
+
+  .pvp-rival-panel {
+    min-width: 86px;
+    padding: 6px 8px;
+  }
+
+  .pvp-rival-panel strong {
+    font-size: 14px;
+  }
+
   .icon-btn {
     width: 34px;
     height: 34px;
@@ -1143,6 +1243,12 @@ h2 {
   .fineprint {
     margin-top: 17px;
     font-size: 9px;
+  }
+
+  .title-actions .btn {
+    min-height: 42px;
+    padding: 0 18px;
+    font-size: 11px;
   }
 
   .upgrade-screen {

@@ -1,4 +1,5 @@
 import { formatTime } from '../core/math.js';
+import { PVP } from '../config.js';
 import { moneyParts } from './format.js';
 
 const TOAST_CLASS = {
@@ -13,6 +14,7 @@ export class HUD {
     this.root = document.getElementById('hud');
     this.cash = document.getElementById('cash-value');
     this.cashSymbol = document.querySelector('.cash-symbol');
+    this.context = document.getElementById('hud-context');
     this.speed = document.getElementById('speed-value');
     this.nitroGauge = document.getElementById('nitro-gauge');
     this.nitroFill = document.getElementById('nitro-fill');
@@ -23,13 +25,19 @@ export class HUD {
     this.passengerList = document.getElementById('passenger-list');
     this.passengerCapacity = document.getElementById('passenger-capacity');
     this.prompt = document.getElementById('prompt');
+    this.promptKey = document.getElementById('prompt-key');
     this.promptText = document.getElementById('prompt-text');
     this.alertChip = document.getElementById('alert-chip');
     this.toasts = document.getElementById('toasts');
     this.muteBtn = document.getElementById('mute-btn');
     this.muteIcon = document.getElementById('mute-icon');
     this.pauseBtn = document.getElementById('pause-btn');
+    this.driveModeBtn = document.getElementById('drive-mode-btn');
     this.shiftLabel = document.getElementById('shift-label');
+    this.passengerIcon = document.querySelector('.passenger-chip .cross');
+    this.rivalPanel = document.getElementById('pvp-rival-panel');
+    this.rivalCash = document.getElementById('pvp-rival-cash');
+    this.rivalAmmo = document.getElementById('pvp-rival-ammo');
 
     this.lastMoney = null;
     this.lastSpeed = null;
@@ -37,6 +45,7 @@ export class HUD {
     this.lastPassengerText = null;
     this.lastPrompt = null;
     this.lastPromptLocked = null;
+    this.lastPromptKey = null;
     this.lastAlert = null;
     this.passengerSignature = '';
     this.passengerRows = [];
@@ -52,7 +61,13 @@ export class HUD {
       this.pauseBtn.blur();
     });
 
+    this.driveModeBtn.addEventListener('click', () => {
+      this.game.toggleMouseDrive();
+      this.driveModeBtn.blur();
+    });
+
     this.setMuted(game.audio.muted);
+    this.setDriveMode(game.mouseDriveEnabled);
   }
 
   show() {
@@ -69,8 +84,20 @@ export class HUD {
     this.muteBtn.classList.toggle('is-muted', muted);
   }
 
+  setDriveMode(mouseEnabled) {
+    this.driveModeBtn.textContent = mouseEnabled ? '鼠标' : 'WASD';
+    this.driveModeBtn.setAttribute('aria-pressed', String(mouseEnabled));
+    this.driveModeBtn.setAttribute(
+      'aria-label',
+      mouseEnabled ? '切换到键盘驾驶' : '切换到鼠标目标驾驶'
+    );
+    this.driveModeBtn.title = mouseEnabled ? '切换到 WASD (C)' : '切换到鼠标驾驶 (C)';
+    this.driveModeBtn.classList.toggle('is-mouse', mouseEnabled);
+  }
+
   update() {
     const game = this.game;
+    const pvpActive = game.pvp.active;
     const money = game.upgrades.money;
 
     if (money !== this.lastMoney) {
@@ -79,6 +106,12 @@ export class HUD {
       this.cash.textContent = parts.text;
       this.cashSymbol.textContent = parts.symbol;
       this.cash.parentElement.classList.toggle('is-negative', money < 0);
+    }
+    this.context.textContent = pvpActive ? 'P1 · MONEY = HP' : 'DISTRICT 07 · 夜班';
+    this.rivalPanel.hidden = !pvpActive;
+    if (pvpActive) {
+      this.rivalCash.textContent = moneyParts(game.pvp.opponentMoney).text;
+      this.rivalAmmo.textContent = `${game.pvp.ammo[1].length}/${PVP.ammoCapacity}`;
     }
 
     const speed = game.player.speedKmh;
@@ -103,14 +136,17 @@ export class HUD {
     }
 
     const capacity = game.upgrades.stats.capacity;
-    const count = game.patients.passengers.length;
-    const passengerText = `${count}/${capacity}`;
+    const count = pvpActive ? game.pvp.ammo[0].length : game.patients.passengers.length;
+    const passengerText = `${count}/${pvpActive ? PVP.ammoCapacity : capacity}`;
     if (passengerText !== this.lastPassengerText) {
       this.lastPassengerText = passengerText;
       this.passengerCount.textContent = passengerText;
       this.passengerCapacity.textContent = `${count} / ${capacity}`;
-      this.passengerPanel.hidden = count === 0;
+      this.passengerPanel.hidden = pvpActive || count === 0;
     }
+    this.passengerIcon.textContent = pvpActive ? '➤' : '✚';
+    this.passengerChipTitle = pvpActive ? 'P1 弹药' : '车上病人';
+    this.passengerIcon.parentElement.title = this.passengerChipTitle;
 
     this.updatePassengers();
 
@@ -124,8 +160,8 @@ export class HUD {
     if (alert !== this.lastAlert) {
       this.lastAlert = alert;
       this.alertChip.hidden = !alert;
-      this.shiftLabel.textContent = alert ? '病人危重' : '值班中';
     }
+    this.shiftLabel.textContent = pvpActive ? 'PVP 对战' : alert ? '病人危重' : '值班中';
   }
 
   updatePassengers() {
@@ -167,20 +203,28 @@ export class HUD {
     }
   }
 
-  setPrompt(text, locked = false) {
+  setPrompt(text, locked = false, key = 'E') {
     if (!text) {
       if (this.lastPrompt !== null) {
         this.lastPrompt = null;
+        this.lastPromptLocked = null;
+        this.lastPromptKey = null;
         this.prompt.hidden = true;
       }
       return;
     }
 
-    if (text === this.lastPrompt && locked === this.lastPromptLocked) return;
+    if (
+      text === this.lastPrompt &&
+      locked === this.lastPromptLocked &&
+      key === this.lastPromptKey
+    ) return;
 
     this.lastPrompt = text;
     this.lastPromptLocked = locked;
+    this.lastPromptKey = key;
     this.prompt.hidden = false;
+    this.promptKey.textContent = key;
     this.promptText.textContent = text;
     this.prompt.classList.toggle('is-locked', locked);
   }
